@@ -1,19 +1,42 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"net/http"
-	"github.com/joho/godotenv"
+	"os"
+
+	"github.com/dasotd/rssagg/internal/database"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
+
+type apiConfig struct {
+	DB *database.Queries
+}
 
 func main(){
 	fmt.Println("Hello UK")
 	godotenv.Load()
 	PORTSTRING := os.Getenv("PORT")
+	DB_URL := os.Getenv("DB_URL")
+	if DB_URL == "" {
+		log.Fatal(" error loading DBURL from the env file")
+
+	}
+	con, err := sql.Open("postgres", DB_URL)
+	if err != nil {
+		log.Fatal("can't connect to DB")
+	}
+	queries := database.New(con)
+
+
+	apiCfg := apiConfig{
+		DB:queries,
+	}
 
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{
@@ -29,6 +52,7 @@ func main(){
 	
 	  v1Router := chi.NewRouter()
 	  v1Router.Post("/healthz", handlerReadiness)
+	  v1Router.Post("/users", apiCfg.handlerCreateuser)
 
 	  v1Router.Post("/err", handlerError)
 
@@ -41,7 +65,7 @@ func main(){
 	}
 
 	log.Printf("server starting on port %v", PORTSTRING)
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,6 +77,7 @@ func main(){
 		log.Fatal(" error loading port from the env file")
 
 	}
+	
 	fmt.Println("Port:", PORTSTRING)
 
 }
